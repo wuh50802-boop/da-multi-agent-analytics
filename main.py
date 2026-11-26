@@ -1,4 +1,4 @@
-"""电商数仓 ETL 入口：ODS → DWD → DWS → ADS。
+"""电商数仓 ETL 入口：ODS → DWD → DIM → DWS → ADS。
 
 既可手动执行（python main.py），也由调度器定时调用 run_etl()。
 """
@@ -14,6 +14,8 @@ from src.etl.data_storage import (
     save_to_ods,
     read_from_ods,
     save_to_dwd,
+    save_to_dim_product,
+    save_to_dim_kol,
     save_to_dws,
     save_to_ads
 )
@@ -37,6 +39,8 @@ def run_etl():
     ods_rows = read_from_ods()
     dwd_records = transform_ods_to_dwd(ods_rows)
     save_to_dwd(dwd_records)
+    save_to_dim_product()
+    save_to_dim_kol()
     save_to_dws()
     save_to_ads()
 

@@ -214,3 +214,139 @@ def save_to_ads():
             cursor.close()
         if connection:
             connection.close()
+
+
+def save_to_dim_product():
+    """按 平台 x 商品ID 聚合，生成商品维表（名称取最新成交记录）。"""
+    connection = None
+    cursor = None
+    try:
+        connection = _connect()
+        cursor = connection.cursor()
+        sql = """
+        INSERT INTO dim_product (
+            `平台`, `商品ID`, `商品名称`,
+            `总销量`, `总GMV`, `总实付金额`, `总退款金额`,
+            `最早成交时间`, `最后成交时间`
+        )
+        SELECT
+            `平台`, `商品ID`, `商品名称`,
+            `总销量`, `总GMV`, `总实付金额`, `总退款金额`,
+            `最早成交时间`, `最后成交时间`
+        FROM (
+            SELECT
+                `平台`, `商品ID`,
+                MAX(CASE WHEN rn = 1 THEN `商品名称` END) AS `商品名称`,
+                SUM(`购买数量`) AS `总销量`,
+                SUM(`订单总额`) AS `总GMV`,
+                SUM(`买家实付`) AS `总实付金额`,
+                SUM(`退款金额`) AS `总退款金额`,
+                MIN(`支付时间`) AS `最早成交时间`,
+                MAX(`支付时间`) AS `最后成交时间`
+            FROM (
+                SELECT
+                    `平台`, `商品ID`, `商品名称`, `购买数量`,
+                    `订单总额`, `买家实付`, `退款金额`, `支付时间`,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY `平台`, `商品ID` ORDER BY `支付时间` DESC
+                    ) AS rn
+                FROM dwd_orders
+                WHERE `支付时间` IS NOT NULL
+            ) t
+            GROUP BY `平台`, `商品ID`
+        ) agg
+        ON DUPLICATE KEY UPDATE
+            `商品名称` = VALUES(`商品名称`),
+            `总销量` = VALUES(`总销量`),
+            `总GMV` = VALUES(`总GMV`),
+            `总实付金额` = VALUES(`总实付金额`),
+            `总退款金额` = VALUES(`总退款金额`),
+            `最早成交时间` = VALUES(`最早成交时间`),
+            `最后成交时间` = VALUES(`最后成交时间`),
+            `更新时间` = CURRENT_TIMESTAMP
+        """
+        cursor.execute(sql)
+        connection.commit()
+        cursor.execute("SELECT COUNT(*) FROM dim_product")
+        total_rows = cursor.fetchone()[0]
+        logger.info("DIM 商品维表生成成功，表内共 %s 行", total_rows)
+    except mysql.connector.Error:
+        if connection:
+            connection.rollback()
+        logger.exception("DIM 商品维表生成失败")
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+
+def save_to_dim_kol():
+    """按 平台 x 达人UID 聚合，生成达人维表（名称取最新成交记录）。"""
+    connection = None
+    cursor = None
+    try:
+        connection = _connect()
+        cursor = connection.cursor()
+        sql = """
+        INSERT INTO dim_kol (
+            `平台`, `达人UID`, `达人名称`,
+            `支付订单数`, `总销量`, `总GMV`, `净GMV`, `总佣金`,
+            `退货率`, `最早成交时间`, `最后成交时间`
+        )
+        SELECT
+            `平台`, `达人UID`, `达人名称`,
+            `支付订单数`, `总销量`, `总GMV`, `净GMV`, `总佣金`,
+            `退货率`, `最早成交时间`, `最后成交时间`
+        FROM (
+            SELECT
+                `平台`, `达人UID`,
+                MAX(CASE WHEN rn = 1 THEN `达人名称` END) AS `达人名称`,
+                COUNT(*) AS `支付订单数`,
+                SUM(`购买数量`) AS `总销量`,
+                SUM(`订单总额`) AS `总GMV`,
+                SUM(`订单总额` - `退款金额`) AS `净GMV`,
+                SUM(`达人佣金`) AS `总佣金`,
+                ROUND(SUM(`退款金额` > 0) / COUNT(*), 4) AS `退货率`,
+                MIN(`支付时间`) AS `最早成交时间`,
+                MAX(`支付时间`) AS `最后成交时间`
+            FROM (
+                SELECT
+                    `平台`, `达人UID`, `达人名称`, `购买数量`,
+                    `订单总额`, `退款金额`, `达人佣金`, `支付时间`,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY `平台`, `达人UID` ORDER BY `支付时间` DESC
+                    ) AS rn
+                FROM dwd_orders
+                WHERE `支付时间` IS NOT NULL
+            ) t
+            GROUP BY `平台`, `达人UID`
+        ) agg
+        ON DUPLICATE KEY UPDATE
+            `达人名称` = VALUES(`达人名称`),
+            `支付订单数` = VALUES(`支付订单数`),
+            `总销量` = VALUES(`总销量`),
+            `总GMV` = VALUES(`总GMV`),
+            `净GMV` = VALUES(`净GMV`),
+            `总佣金` = VALUES(`总佣金`),
+            `退货率` = VALUES(`退货率`),
+            `最早成交时间` = VALUES(`最早成交时间`),
+            `最后成交时间` = VALUES(`最后成交时间`),
+            `更新时间` = CURRENT_TIMESTAMP
+        """
+        cursor.execute(sql)
+        connection.commit()
+        cursor.execute("SELECT COUNT(*) FROM dim_kol")
+        total_rows = cursor.fetchone()[0]
+        logger.info("DIM 达人维表生成成功，表内共 %s 行", total_rows)
+    except mysql.connector.Error:
+        if connection:
+            connection.rollback()
+        logger.exception("DIM 达人维表生成失败")
+        raise
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()

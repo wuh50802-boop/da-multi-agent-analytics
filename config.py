@@ -58,10 +58,12 @@ MAX_QUERY_ROWS = 1000
 # SQL 查询超时时间，单位：秒
 SQL_QUERY_TIMEOUT = 10
 
-# Agent 允许查询的数据表（电商数仓四层）
+# Agent 允许查询的数据表（电商数仓：ODS/DWD/DIM/DWS/ADS）
 ALLOWED_TABLES = [
     "ods_orders_raw",
     "dwd_orders",
+    "dim_product",
+    "dim_kol",
     "dws_kol_daily",
     "ads_kol_rank",
 ]

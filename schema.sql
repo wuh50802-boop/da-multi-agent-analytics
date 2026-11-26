@@ -115,3 +115,47 @@ CREATE TABLE IF NOT EXISTS `ads_kol_rank` (
   UNIQUE KEY `uk_kol_month` (`统计月份`, `平台`, `达人UID`),
   KEY `idx_rank` (`统计月份`, `平台`, `排名`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='ADS 达人月度榜单表';
+
+-- ------------------------------------------------------------
+-- 5. DIM 层：商品维表（平台 x 商品ID）
+--    从 DWD 聚合出商品的累计表现，供"某商品卖得怎么样"类问题直查
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `dim_product` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键',
+  `平台` VARCHAR(16) NOT NULL COMMENT '抖店/微信/小红书',
+  `商品ID` VARCHAR(64) NOT NULL COMMENT '商品ID',
+  `商品名称` VARCHAR(255) NOT NULL DEFAULT '' COMMENT '商品名称（取最新）',
+  `总销量` DECIMAL(18,0) NOT NULL DEFAULT 0 COMMENT '累计支付销量',
+  `总GMV` DECIMAL(18,2) NOT NULL DEFAULT 0.00 COMMENT '累计订单总额(元)',
+  `总实付金额` DECIMAL(18,2) NOT NULL DEFAULT 0.00 COMMENT '累计买家实付(元)',
+  `总退款金额` DECIMAL(18,2) NOT NULL DEFAULT 0.00 COMMENT '累计退款(元)',
+  `最早成交时间` DATETIME DEFAULT NULL COMMENT '最早支付时间',
+  `最后成交时间` DATETIME DEFAULT NULL COMMENT '最后支付时间',
+  `创建时间` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+  `更新时间` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_platform_product` (`平台`, `商品ID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='DIM 商品维度表';
+
+-- ------------------------------------------------------------
+-- 6. DIM 层：达人维表（平台 x 达人UID）
+--    从 DWD 聚合出达人的累计表现，供"某达人带货能力"类问题直查
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `dim_kol` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键',
+  `平台` VARCHAR(16) NOT NULL COMMENT '抖店/微信/小红书',
+  `达人UID` VARCHAR(64) NOT NULL COMMENT '达人ID',
+  `达人名称` VARCHAR(64) NOT NULL DEFAULT '' COMMENT '达人名称（取最新）',
+  `支付订单数` INT NOT NULL DEFAULT 0 COMMENT '累计支付订单数',
+  `总销量` DECIMAL(18,0) NOT NULL DEFAULT 0 COMMENT '累计销量',
+  `总GMV` DECIMAL(18,2) NOT NULL DEFAULT 0.00 COMMENT '累计订单总额(元)',
+  `净GMV` DECIMAL(18,2) NOT NULL DEFAULT 0.00 COMMENT '累计GMV减退款(元)',
+  `总佣金` DECIMAL(18,2) NOT NULL DEFAULT 0.00 COMMENT '累计达人佣金(元)',
+  `退货率` DECIMAL(8,4) NOT NULL DEFAULT 0.0000 COMMENT '退款订单占比',
+  `最早成交时间` DATETIME DEFAULT NULL COMMENT '最早支付时间',
+  `最后成交时间` DATETIME DEFAULT NULL COMMENT '最后支付时间',
+  `创建时间` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+  `更新时间` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_platform_kol` (`平台`, `达人UID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='DIM 达人维度表';

@@ -1,0 +1,22 @@
+# 环境与密钥
+.venv/
+.env
+*.env.local
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# 前端依赖与构建产物
+node_modules/
+dist/
+
+# 运行日志
+logs/
+
+# 工作记忆与本地工具数据
+.workbuddy/
+
+# 旧数据快照（已弃用，新数据源为 mock_orders）
+data/posts.csv

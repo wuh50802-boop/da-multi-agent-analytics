@@ -1,0 +1,1233 @@
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  background: #f5f7fb;
+  color: #202938;
+}
+
+.dashboard {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+/* 左侧导航 */
+.sidebar {
+  width: 240px;
+  background: #172338;
+  color: white;
+  padding: 28px 18px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 48px;
+}
+
+.logo-icon {
+  width: 36px;
+  height: 36px;
+  background: #4778e8;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+}
+
+.nav-title {
+  color: #8995a8;
+  font-size: 12px;
+  margin: 0 0 16px 10px;
+}
+
+.nav-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 12px;
+  border-radius: 8px;
+  color: #c4ccda;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.nav-item.active {
+  color: white;
+  background: #2d4367;
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  color: #d6deeb;
+  font-size: 12px;
+  line-height: 2;
+}
+
+.sidebar-bottom span {
+  color: #8995a8;
+}
+
+/* 右侧内容 */
+.main-content {
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.topbar {
+  height: 86px;
+  background: white;
+  border-bottom: 1px solid #e9edf3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 36px;
+  flex-shrink: 0;
+}
+
+.topbar h2 {
+  margin: 0 0 6px;
+  font-size: 19px;
+}
+
+.topbar p {
+  margin: 0;
+  color: #8a94a5;
+  font-size: 12px;
+}
+
+.user-info {
+  font-size: 13px;
+  color: #647084;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  background: #22b573;
+  border-radius: 50%;
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 28px 32px;
+}
+
+.welcome h1 {
+  font-size: 24px;
+  margin: 0 0 10px;
+}
+
+.welcome p {
+  color: #8791a1;
+  font-size: 14px;
+  margin: 0;
+}
+
+/* 统计卡片 */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 28px;
+}
+
+.stat-card {
+  background: white;
+  border: 1px solid #edf0f5;
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.stat-card p {
+  color: #768195;
+  font-size: 14px;
+  margin: 0 0 18px;
+}
+
+.stat-card h2 {
+  font-size: 28px;
+  margin: 0 0 12px;
+}
+
+.stat-card span {
+  color: #9aa3b2;
+  font-size: 12px;
+}
+
+/* 图表区域 */
+.chart-card {
+  background: white;
+  border: 1px solid #edf0f5;
+  border-radius: 12px;
+  margin-top: 24px;
+  padding: 24px;
+  min-height: 260px;
+}
+
+.chart-card h3 {
+  font-size: 16px;
+  margin: 0 0 14px;
+}
+
+.chart-card p {
+  color: #9aa3b2;
+  font-size: 13px;
+}
+
+/* 适配较窄屏幕 */
+@media (max-width: 1100px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .sidebar {
+    width: 72px;
+    padding: 20px 10px;
+  }
+
+  .logo > span:last-child,
+  .nav-title,
+  .nav-item span:last-child,
+  .sidebar-bottom {
+    display: none;
+  }
+
+  .nav-item {
+    justify-content: center;
+  }
+
+  .content {
+    padding: 20px 14px;
+  }
+
+  .topbar {
+    padding: 0 16px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.chart-container {
+  width: 100%;
+  height: 240px;
+  margin-top: 16px;
+}
+
+.error-message {
+  background: #fff1f0;
+  color: #cf4444;
+  border: 1px solid #ffd6d2;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+.chart-loading {
+  height: 240px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #999;
+  font-size: 14px;
+}
+.filter-section {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: #fff;
+  border-radius: 12px;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filter-item label {
+  font-size: 13px;
+  color: #666;
+}
+
+.filter-item input {
+  padding: 9px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #333;
+}
+.filter-actions {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.filter-button {
+  padding: 10px 22px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.filter-button.primary {
+  background: #4778e8;
+  color: #fff;
+}
+
+.filter-button.secondary {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.filter-error {
+  color: #e74c3c;
+  font-size: 13px;
+  margin: -12px 0 20px;
+}
+/* 两张趋势图并排 */
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+/* 网格中的图表取消原有顶部间距 */
+.chart-grid .chart-card {
+  margin-top: 0;
+}
+
+/* Agent 成本排行独占一行 */
+.chart-grid + .chart-card {
+  margin-top: 20px;
+}
+
+/* 小屏幕自动改为单列 */
+@media (max-width: 900px) {
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.error-message {
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  color: #b42318;
+  background: #fff1f0;
+  border: 1px solid #ffccc7;
+  border-left: 5px solid #e5484d;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.filter-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background-color: #d1d5db;
+  color: #6b7280;
+}
+/* 页面占位内容 */
+.page-placeholder {
+  min-height: 300px;
+  padding: 28px;
+  background: #ffffff;
+  border: 1px solid #e8edf5;
+  border-radius: 12px;
+}
+
+.page-placeholder h2 {
+  margin-bottom: 12px;
+  color: #1e293b;
+  font-size: 22px;
+}
+
+.page-placeholder p {
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.8;
+}
+/* 任务列表表格容器 */
+.task-table-wrapper {
+  width: 100%;
+  margin-top: 24px;
+  overflow-x: auto;
+  border: 1px solid #e8edf5;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+/* 任务列表表格 */
+.task-table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+/* 表头 */
+.task-table thead {
+  background: #f8fafc;
+}
+
+.task-table th {
+  padding: 14px 16px;
+  color: #64748b;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid #e8edf5;
+}
+
+/* 表格内容 */
+.task-table td {
+  padding: 14px 16px;
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+/* 鼠标悬停 */
+.task-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* 最后一行不显示底部边框 */
+.task-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* 任务 ID */
+.task-id {
+  max-width: 180px;
+  font-family: monospace;
+  font-size: 12px;
+  color: #64748b;
+  word-break: break-all;
+}
+
+/* 用户问题 */
+.task-question {
+  min-width: 260px;
+  max-width: 420px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+/* 状态标签 */
+.task-status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* 已完成 */
+.status-completed {
+  color: #15803d;
+  background: #dcfce7;
+}
+
+/* 执行中 */
+.status-running {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+/* 等待审批 */
+.status-awaiting_approval {
+  color: #b45309;
+  background: #fef3c7;
+}
+
+/* 等待执行 */
+.status-pending {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+/* 执行失败 */
+.status-failed {
+  color: #b91c1c;
+  background: #fee2e2;
+}
+
+/* 已拒绝 */
+.status-rejected {
+  color: #7e22ce;
+  background: #f3e8ff;
+}
+
+/* 超出预算 */
+.status-budget_exceeded {
+  color: #c2410c;
+  background: #ffedd5;
+}
+
+/* 任务总数 */
+.task-total {
+  margin-top: 12px;
+  color: #64748b;
+  font-size: 14px;
+}
+/* 任务状态筛选 */
+.task-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.task-filter label {
+  color: #475569;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.task-filter select {
+  min-width: 160px;
+  padding: 9px 12px;
+  border: 1px solid #dbe2ea;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+.task-filter select:focus {
+  border-color: #4778e8;
+  box-shadow: 0 0 0 3px rgba(71, 120, 232, 0.12);
+}
+
+.task-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.task-search input {
+  width: 280px;
+  padding: 9px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+}
+
+.task-search input:focus {
+  border-color: #4096ff;
+}
+
+.task-search button {
+  white-space: nowrap;
+}
+
+.task-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+  padding: 16px 0;
+  color: #667085;
+  font-size: 14px;
+}
+
+.pagination-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.pagination-buttons button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+/* 任务详情弹窗遮罩 */
+.task-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  background: rgba(16, 24, 40, 0.55);
+}
+
+/* 弹窗主体 */
+.task-modal {
+  width: 100%;
+  max-width: 1000px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 24px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
+
+/* 弹窗标题 */
+.task-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.task-modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.task-modal-close {
+  border: none;
+  background: transparent;
+  font-size: 28px;
+  color: #667085;
+  cursor: pointer;
+}
+
+/* 加载状态 */
+.task-detail-loading {
+  padding: 40px;
+  text-align: center;
+  color: #667085;
+}
+
+/* 详情分区 */
+.task-detail-section {
+  margin-bottom: 28px;
+}
+
+.task-detail-section h3 {
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eaecf0;
+  font-size: 16px;
+}
+
+/* 详情信息网格 */
+.task-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.task-detail-grid span,
+.task-detail-field span {
+  color: #667085;
+  font-size: 13px;
+}
+
+.task-detail-grid p,
+.task-detail-field p {
+  margin: 6px 0 0;
+  color: #101828;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.task-detail-field {
+  margin-top: 20px;
+}
+
+.task-detail-error {
+  color: #b42318 !important;
+}
+
+/* Agent 表格横向滚动 */
+.task-detail-section .task-table {
+  min-width: 760px;
+}
+
+@media (max-width: 600px) {
+  .task-modal-overlay {
+    padding: 10px;
+  }
+
+  .task-modal {
+    padding: 16px;
+  }
+
+  .task-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* SQL 代码展示 */
+.task-sql-code {
+  margin-top: 10px;
+  padding: 16px;
+  background: #1e293b;
+  color: #e2e8f0;
+  border-radius: 8px;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+/* 查询结果表格 */
+.task-result-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 12px;
+}
+
+.task-result-wrapper .task-table {
+  width: 100%;
+  min-width: 400px;
+}
+
+/* QA 检查状态 */
+.qa-status-passed {
+  color: #039855 !important;
+  font-weight: 600;
+}
+
+.qa-status-failed {
+  color: #d92d20 !important;
+  font-weight: 600;
+}
+
+/* QA 问题和建议 */
+.qa-list {
+  margin: 8px 0 0;
+  padding-left: 22px;
+  color: #344054;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+/* 分析报告 */
+.task-report-content {
+  margin-top: 12px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #eaecf0;
+  border-radius: 8px;
+}
+
+.task-report-text {
+  color: #344054;
+  font-size: 14px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.task-report-json {
+  margin: 0;
+  color: #344054;
+  font-family: Consolas, Monaco, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 工作流步骤列表 */
+.workflow-step-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 16px;
+}
+
+.workflow-step {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 58px;
+}
+
+/* 步骤圆形图标 */
+.workflow-step-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #f2f4f7;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 已完成 */
+.workflow-step-icon.completed {
+  background: #dcfae6;
+  color: #039855;
+}
+
+/* 执行失败 */
+.workflow-step-icon.failed {
+  background: #fee4e2;
+  color: #d92d20;
+}
+
+/* 执行中 */
+.workflow-step-icon.running {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+/* 步骤信息 */
+.workflow-step-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workflow-step-name {
+  color: #344054;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.workflow-step-status {
+  color: #98a2b3;
+  font-size: 12px;
+}
+
+.workflow-step-status.completed {
+  color: #039855;
+}
+
+.workflow-step-status.failed {
+  color: #d92d20;
+}
+
+.workflow-step-status.running {
+  color: #2563eb;
+}
+
+.task-action-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.filter-button.danger {
+  background: #d92d20;
+  color: #fff;
+  border: 1px solid #d92d20;
+}
+
+.filter-button.danger:hover {
+  background: #b42318;
+}
+
+.task-action-buttons button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Agent 对话工作区 */
+.agent-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+  height: calc(100vh - 150px);
+  min-height: 500px;
+}
+
+.agent-chat-panel,
+.agent-task-panel {
+  background: #fff;
+  border: 1px solid #e9edf3;
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.agent-chat-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.agent-panel-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #edf0f5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.agent-panel-header h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.agent-panel-header p {
+  margin: 0;
+  color: #8993a3;
+  font-size: 13px;
+}
+
+.agent-new-chat {
+  border: 1px solid #dce4f0;
+  background: white;
+  color: #4778e8;
+  padding: 9px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.agent-message-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.agent-empty {
+  max-width: 520px;
+  margin: 90px auto 0;
+  text-align: center;
+}
+
+.agent-empty-icon {
+  font-size: 42px;
+  color: #4778e8;
+}
+
+.agent-empty h3 {
+  margin: 16px 0 10px;
+}
+
+.agent-empty p {
+  color: #8993a3;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.agent-examples {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.agent-examples button {
+  padding: 10px 14px;
+  background: #f5f7fb;
+  border: 1px solid #e5eaf2;
+  border-radius: 8px;
+  color: #52627a;
+  cursor: pointer;
+}
+
+.agent-message {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  align-items: flex-start;
+}
+
+.agent-message.user {
+  flex-direction: row-reverse;
+}
+
+.agent-message-avatar {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #eaf0ff;
+  color: #4778e8;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.agent-message.user .agent-message-avatar {
+  background: #e9f7f0;
+  color: #219866;
+}
+
+.agent-message-content {
+  max-width: 80%;
+  min-width: 0;
+}
+
+.agent-message-role {
+  color: #8993a3;
+  font-size: 12px;
+  margin-bottom: 7px;
+}
+
+.agent-message-content pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.8;
+  margin: 0;
+  padding: 13px 16px;
+  border-radius: 10px;
+  background: #f5f7fb;
+}
+
+.agent-message.user .agent-message-content pre {
+  background: #edf3ff;
+}
+
+.agent-thinking {
+  color: #4778e8;
+  font-size: 13px;
+  padding: 12px 0;
+}
+
+.agent-loading-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 9px;
+  border-radius: 50%;
+  background: #4778e8;
+  animation: agent-pulse 1s infinite alternate;
+}
+
+@keyframes agent-pulse {
+  from { opacity: 0.3; }
+  to { opacity: 1; }
+}
+
+.agent-input-area {
+  padding: 16px 20px;
+  border-top: 1px solid #edf0f5;
+}
+
+.agent-input-area textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid #dce3ed;
+  border-radius: 9px;
+  padding: 12px;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+
+.agent-input-area textarea:focus {
+  border-color: #4778e8;
+}
+
+.agent-input-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.agent-input-footer span {
+  font-size: 12px;
+  color: #9aa3b1;
+}
+
+.agent-input-footer button,
+.agent-approval-actions button:first-child {
+  background: #4778e8;
+  color: white;
+  border: none;
+  border-radius: 7px;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+
+.agent-input-footer button:disabled,
+.agent-approval-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.agent-error,
+.agent-task-error {
+  margin: 12px 20px;
+  padding: 12px;
+  background: #fff2f0;
+  color: #c74738;
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.agent-task-panel {
+  padding: 22px;
+  overflow-y: auto;
+}
+
+.agent-task-panel > h3 {
+  margin: 0 0 22px;
+  font-size: 17px;
+}
+
+.agent-task-empty {
+  text-align: center;
+  margin-top: 100px;
+  color: #9aa3b1;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.agent-task-empty span {
+  font-size: 30px;
+}
+
+.agent-task-meta > div {
+  margin-bottom: 15px;
+}
+
+.agent-task-meta span,
+.agent-task-meta strong,
+.agent-task-meta small {
+  display: block;
+}
+
+.agent-task-meta span {
+  color: #8993a3;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.agent-task-meta strong,
+.agent-task-meta small {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.agent-task-section {
+  border-top: 1px solid #edf0f5;
+  padding-top: 18px;
+  margin-top: 18px;
+}
+
+.agent-task-section h4,
+.agent-approval h4,
+.agent-task-error h4 {
+  margin: 0 0 14px;
+  font-size: 14px;
+}
+
+.agent-step {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 15px 0;
+  font-size: 12px;
+}
+
+.agent-step small {
+  margin-left: auto;
+  color: #8993a3;
+}
+
+.agent-step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cbd2dd;
+  flex-shrink: 0;
+}
+
+.agent-step-dot.completed {
+  background: #20a66a;
+}
+
+.agent-step-dot.running {
+  background: #4778e8;
+}
+
+.agent-step-dot.failed {
+  background: #e05252;
+}
+
+.agent-approval {
+  border-top: 1px solid #edf0f5;
+  padding-top: 18px;
+  margin-top: 18px;
+}
+
+.agent-approval pre,
+.agent-result {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 300px;
+  overflow: auto;
+  background: #f5f7fb;
+  border-radius: 7px;
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.agent-approval-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.agent-approval-actions button:last-child {
+  background: #fff;
+  color: #d04b4b;
+  border: 1px solid #f0cccc;
+  border-radius: 7px;
+  padding: 9px 16px;
+  cursor: pointer;
+}
+
+.agent-task-error p {
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1000px) {
+  .agent-workspace {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .agent-chat-panel {
+    min-height: 600px;
+  }
+
+  .agent-task-panel {
+    min-height: 250px;
+  }
+}

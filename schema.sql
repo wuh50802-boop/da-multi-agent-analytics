@@ -159,3 +159,79 @@ CREATE TABLE IF NOT EXISTS `dim_kol` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_platform_kol` (`平台`, `达人UID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='DIM 达人维度表';
+
+-- ============================================================
+-- 企业治理层（表名统一 sys_ 前缀，英文字段名，与其他层区分）
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 7. 元数据字典：从 information_schema 自动采集全部业务表结构
+--    为 Text-to-SQL 提供结构化 Schema 上下文
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sys_metadata_dict` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `table_name` VARCHAR(128) NOT NULL COMMENT '表英文名',
+  `table_comment` VARCHAR(256) DEFAULT NULL COMMENT '表业务含义',
+  `column_name` VARCHAR(128) NOT NULL COMMENT '字段英文名',
+  `column_type` VARCHAR(64) DEFAULT NULL COMMENT '字段类型',
+  `column_comment` TEXT COMMENT '字段业务口径',
+  `is_pk` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否主键',
+  `is_nullable` VARCHAR(10) NOT NULL DEFAULT 'YES' COMMENT '是否可空',
+  `column_order` INT NOT NULL DEFAULT 0 COMMENT '字段顺序',
+  `security_level` VARCHAR(16) NOT NULL DEFAULT 'L1' COMMENT '安全等级 L1公开/L2内部/L3敏感',
+  `is_sensitive` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否敏感字段',
+  `data_owner` VARCHAR(64) NOT NULL DEFAULT 'DataTeam' COMMENT '数据负责人',
+  `tag_list` VARCHAR(255) DEFAULT NULL COMMENT '业务标签',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '采集时间',
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_table_column` (`table_name`, `column_name`),
+  KEY `idx_table` (`table_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统-元数据字典表';
+
+-- ------------------------------------------------------------
+-- 8. RAG 知识库：文档表 + 切块表
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sys_knowledge_docs` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `doc_id` VARCHAR(64) NOT NULL COMMENT '文档唯一ID',
+  `title` VARCHAR(255) NOT NULL COMMENT '文档标题',
+  `source_type` VARCHAR(32) NOT NULL DEFAULT 'text' COMMENT '来源类型 text/md/json',
+  `content` LONGTEXT NOT NULL COMMENT '文档全文',
+  `chunk_count` INT NOT NULL DEFAULT 0 COMMENT '切块数量',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_doc_id` (`doc_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统-RAG文档表';
+
+CREATE TABLE IF NOT EXISTS `sys_knowledge_chunks` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `doc_id` VARCHAR(64) NOT NULL COMMENT '所属文档ID',
+  `chunk_index` INT NOT NULL COMMENT '切块序号',
+  `content` TEXT NOT NULL COMMENT '切块内容',
+  `embedding` LONGTEXT NOT NULL COMMENT '向量（JSON数组）',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_doc_chunk` (`doc_id`, `chunk_index`),
+  KEY `idx_doc` (`doc_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统-RAG切块向量表';
+
+-- ------------------------------------------------------------
+-- 9. 审计日志：全链路治理事件（入口/权限/执行/QA/输出）
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sys_audit_log` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `trace_id` VARCHAR(64) NOT NULL COMMENT '链路追踪ID',
+  `task_id` VARCHAR(64) DEFAULT NULL COMMENT '关联任务ID',
+  `event_type` VARCHAR(32) NOT NULL COMMENT '事件类型 entry/permission/execution/qa/output',
+  `actor` VARCHAR(64) NOT NULL DEFAULT 'system' COMMENT '操作者',
+  `action` VARCHAR(255) NOT NULL COMMENT '操作描述',
+  `detail` JSON DEFAULT NULL COMMENT '事件详情',
+  `risk_level` VARCHAR(16) NOT NULL DEFAULT 'L1' COMMENT '风险等级 L1/L2/L3',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '事件时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_trace` (`trace_id`),
+  KEY `idx_task` (`task_id`),
+  KEY `idx_event` (`event_type`),
+  KEY `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统-全链路审计日志表';

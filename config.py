@@ -81,3 +81,22 @@ MAX_TASK_COST_RMB = 1.0
 
 # QA 未通过时最多重写报告的次数（0 表示不返工，直接失败）
 MAX_QA_REVISIONS = int(os.getenv("MAX_QA_REVISIONS", "2"))
+
+# ==================== 企业治理配置 ====================
+# 敏感字段清单（命中 SQL 时按权限分级拦截）
+SENSITIVE_FIELDS = {"用户ID", "收件省份", "收件城市", "原始数据"}
+# 管理员白名单（管理员可查询敏感字段；空列表表示仅演示模式全员可查）
+ADMIN_USERS = [u.strip() for u in os.getenv("ADMIN_USERS", "").split(",") if u.strip()]
+# 数据范围守卫：SQL 涉及的最大回溯天数（0 表示不限制）
+MAX_QUERY_DAYS = int(os.getenv("MAX_QUERY_DAYS", "366"))
+# 入口治理：Webhook 签名密钥（为空则跳过校验）
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
+# 敏感词拦截（命中即拒绝，防止破坏性操作和批量导出）
+SENSITIVE_KEYWORDS = [
+    "drop table", "truncate", "delete from", "update ", "alter table",
+    "导出手机号", "导出用户", "全部手机号",
+]
+# RAG 切块参数
+RAG_CHUNK_SIZE = int(os.getenv("RAG_CHUNK_SIZE", "500"))
+RAG_CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "50"))
+RAG_TOP_K = int(os.getenv("RAG_TOP_K", "3"))

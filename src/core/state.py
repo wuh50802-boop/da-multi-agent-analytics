@@ -29,6 +29,11 @@ def create_initial_state(question, conversation_id=None):
         "qa_history": [],
         "revision_notes": None,
 
+        # 企业治理：链路追踪 ID、分析规划、用户身份
+        "trace_id": None,
+        "analysis_plan": None,
+        "user": None,
+
         "steps": {
             "routing": "pending",
             "sql_generation": "pending",

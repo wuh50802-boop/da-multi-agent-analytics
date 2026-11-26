@@ -24,8 +24,35 @@ from src.storage.workflow_storage import (
 logger = logging.getLogger(__name__)
 
 
-def create_task(question, conversation_id=None):
-    """创建任务并启动工作流，不处理人工审批"""
+def create_task(
+    question,
+    conversation_id=None,
+    trace_id=None,
+    user=None,
+    skip_entry_guard=False,
+):
+    """创建任务并启动工作流，不处理人工审批。
+
+    入口治理：默认执行敏感词拦截并生成 traceId。
+    """
+
+    # 0. 入口治理：traceId + 敏感词拦截
+    from src.governance.audit import new_trace_id
+    from src.governance.entry import guard_entry
+
+    trace_id = trace_id or new_trace_id()
+
+    if not skip_entry_guard:
+        passed, _risk, reason = guard_entry(
+            question, trace_id=trace_id, task_id=None, actor=user or "user"
+        )
+        if not passed:
+            return {
+                "task_id": None,
+                "status": "rejected",
+                "error": reason,
+                "trace_id": trace_id,
+            }
 
     # 1. 没有传入对话 ID，就创建新对话
     if conversation_id is None:
@@ -40,6 +67,8 @@ def create_task(question, conversation_id=None):
         question,
         conversation_id=conversation_id
     )
+    state["trace_id"] = trace_id
+    state["user"] = user
 
     logger.info(
         "创建工作流任务 | Task：%s | Conversation：%s",

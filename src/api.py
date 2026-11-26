@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from src.storage.workflow_storage import (
@@ -90,13 +90,18 @@ def health_check():
 
 
 @app.post("/chat")
-def chat(request: ChatRequest):
-    """接收用户问题并创建工作流任务"""
+def chat(request: ChatRequest, http_request: Request):
+    """接收用户问题并创建工作流任务（含入口治理）"""
+
+    trace_id = http_request.headers.get("X-Trace-Id")
+    user = http_request.headers.get("X-User-Id")
 
     try:
         result = create_task(
             question=request.question,
-            conversation_id=request.conversation_id
+            conversation_id=request.conversation_id,
+            trace_id=trace_id,
+            user=user,
         )
 
     except ValueError as e:
@@ -105,13 +110,17 @@ def chat(request: ChatRequest):
             detail=str(e)
         )
 
+    if result.get("status") == "rejected" and not result.get("task_id"):
+        raise HTTPException(status_code=403, detail=result.get("error"))
+
     return {
         "task_id": result["task_id"],
-        "conversation_id": result["conversation_id"],
+        "conversation_id": result.get("conversation_id"),
         "status": result["status"],
-        "task_type": result["task_type"],
-        "sql": result["sql"],
-        "reason": result["reason"]
+        "task_type": result.get("task_type"),
+        "sql": result.get("sql"),
+        "reason": result.get("reason"),
+        "trace_id": result.get("trace_id"),
     }
 
 @app.post("/tasks/{task_id}/approve")
@@ -484,4 +493,138 @@ def get_dashboard_usage_trend_api(
             status_code=500,
             detail="获取每日 Token 趋势失败"
         )
+
+
+# ==================== 企业治理端点 ====================
+
+class MetadataSyncResponse(BaseModel):
+    field_count: int
+
+
+class DocUploadRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    content: str = Field(min_length=1)
+    source_type: str = "text"
+
+
+class RagQueryRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=1000)
+    top_k: int | None = None
+
+
+@app.post("/admin/metadata/sync", response_model=MetadataSyncResponse)
+def sync_metadata_api():
+    """元数据治理：从 information_schema 采集表结构"""
+    from src.governance.metadata import sync_metadata
+    try:
+        return {"field_count": sync_metadata()}
+    except Exception:
+        logger.exception("元数据同步 API 失败")
+        raise HTTPException(status_code=500, detail="元数据同步失败")
+
+
+@app.get("/admin/metadata")
+def list_metadata_api(table: str | None = None):
+    """查询元数据字典"""
+    import mysql.connector
+    from config import DB_CONFIG
+    try:
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+        if table:
+            cursor.execute("""
+                SELECT * FROM sys_metadata_dict WHERE table_name = %s
+                ORDER BY column_order
+            """, (table,))
+        else:
+            cursor.execute("SELECT * FROM sys_metadata_dict ORDER BY table_name, column_order")
+        rows = cursor.fetchall()
+        for r in rows:
+            if r.get("updated_at"):
+                r["updated_at"] = r["updated_at"].strftime("%Y-%m-%d %H:%M:%S")
+            if r.get("created_at"):
+                r["created_at"] = r["created_at"].strftime("%Y-%m-%d %H:%M:%S")
+        cursor.close()
+        conn.close()
+        return {"total": len(rows), "data": rows}
+    except Exception:
+        logger.exception("元数据查询 API 失败")
+        raise HTTPException(status_code=500, detail="元数据查询失败")
+
+
+@app.get("/admin/audit")
+def query_audit_api(
+    trace_id: str | None = None,
+    task_id: str | None = None,
+    event_type: str | None = None,
+    limit: int = 100,
+):
+    """审计治理：查询全链路审计日志"""
+    from src.governance.audit import query_audit
+    return {
+        "data": query_audit(
+            trace_id=trace_id, task_id=task_id,
+            event_type=event_type, limit=limit,
+        )
+    }
+
+
+@app.post("/admin/rag/documents")
+def upload_doc_api(request: DocUploadRequest, http_request: Request):
+    """RAG 治理：上传文档并自动切块向量化"""
+    from src.governance.rag import upload_document
+    try:
+        return upload_document(
+            title=request.title,
+            content=request.content,
+            source_type=request.source_type,
+            trace_id=http_request.headers.get("X-Trace-Id"),
+        )
+    except Exception:
+        logger.exception("文档上传 API 失败")
+        raise HTTPException(status_code=500, detail="文档上传失败")
+
+
+@app.get("/admin/rag/documents")
+def list_docs_api():
+    """RAG 治理：列出文档"""
+    from src.governance.rag import list_documents
+    return {"data": list_documents()}
+
+
+@app.post("/admin/rag/search")
+def rag_search_api(request: RagQueryRequest):
+    """RAG 治理：向量检索"""
+    from src.governance.rag import retrieve
+    return {"data": retrieve(request.query, top_k=request.top_k)}
+
+
+@app.get("/tasks/{task_id}/export")
+def export_task_data_api(task_id: str):
+    """输出治理：任务结果导出 CSV（Excel 可直接打开）"""
+    from fastapi.responses import Response
+    from src.governance.export import export_results_csv
+    from src.governance.audit import write_audit
+
+    state = load_workflow_state(task_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    results = state.get("query_results") or []
+    csv_text = export_results_csv(results)
+
+    write_audit(
+        "output", "查询结果导出 CSV",
+        trace_id=state.get("trace_id"), task_id=task_id,
+        actor="user", detail={"rows": len(results)},
+        risk_level="L2" if results else "L1",
+    )
+
+    return Response(
+        content=csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{task_id}.csv"'
+        },
+    )
 

@@ -82,7 +82,7 @@ def route_task(context, task_id=None):
         task_type = result.get("task_type")
         resolved_question = result.get("resolved_question")
 
-        if task_type not in ["sql", "analysis", "chat"]:
+        if task_type not in ["sql", "analysis", "chat", "clarification", "reject"]:
             raise ValueError("模型返回了无效任务类型")
 
         if not resolved_question:

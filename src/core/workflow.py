@@ -22,6 +22,9 @@ from src.core.context_manager import (
     build_agent_context,
     limit_context_size
 )
+from src.governance.analysis import plan_analysis, check_result_validity
+from src.governance.permission import check_sql_permission
+from src.governance.audit import write_audit
 
 logger = logging.getLogger(__name__)
 
@@ -323,6 +326,14 @@ def run_workflow(state):
         # 4. SQL / Analysis
         if state["task_type"] in ["sql", "analysis"]:
 
+            # 分析治理：生成 SQL 前先规划（目标/指标/维度/策略）
+            if state.get("analysis_plan") is None:
+                state["analysis_plan"] = plan_analysis(
+                    state["resolved_question"] or state["question"],
+                    task_id=task_id,
+                    trace_id=state.get("trace_id"),
+                )
+
             # SQL 生成
             if state["sql"] is None:
 
@@ -396,6 +407,27 @@ def run_workflow(state):
 
                 return state
 
+            # 权限治理：SQL 执行前检查敏感字段与数据范围
+            allowed, reason, risk = check_sql_permission(
+                state["sql"],
+                user=state.get("user"),
+                trace_id=state.get("trace_id"),
+                task_id=task_id,
+            )
+            if not allowed:
+                check_execution_lease(
+                    task_id, execution_token, heartbeat.lost_event
+                )
+                state["status"] = "rejected"
+                state["error"] = f"权限治理拦截：{reason}"
+                state["report"] = (
+                    f"该查询未获执行许可：{reason}。"
+                    "如需访问敏感数据，请联系数据管理员。"
+                )
+                save_workflow_state(state, execution_token=execution_token)
+                logger.warning("权限治理拦截 | Task：%s | 原因：%s", task_id, reason)
+                return state
+
             # SQL 执行
             if state["query_results"] is None:
 
@@ -407,6 +439,23 @@ def run_workflow(state):
                     execution_token=execution_token,
                     lost_event=heartbeat.lost_event
                 )
+
+            # 分析治理：空结果友好处理
+            empty_notice = check_result_validity(
+                state["resolved_question"] or state["question"],
+                state["query_results"],
+                task_id=task_id,
+                trace_id=state.get("trace_id"),
+            )
+            if empty_notice:
+                check_execution_lease(
+                    task_id, execution_token, heartbeat.lost_event
+                )
+                state["report"] = empty_notice
+                state["status"] = "completed"
+                state["error"] = None
+                save_workflow_state(state, execution_token=execution_token)
+                return state
 
             # 报告生成 + QA 质检 + 返工闭环
             # 循环体内：生成报告 -> 质检 -> 通过则完成，不通过则带意见重写
@@ -480,6 +529,20 @@ def run_workflow(state):
                     save_workflow_state(
                         state,
                         execution_token=execution_token
+                    )
+
+                    # 输出治理：全链路完成审计
+                    write_audit(
+                        "output", "工作流完成，报告已输出",
+                        trace_id=state.get("trace_id"), task_id=task_id,
+                        actor="system",
+                        detail={
+                            "task_type": state["task_type"],
+                            "qa_attempts": attempt,
+                            "report_length": len(state.get("report") or ""),
+                            "result_count": len(state.get("query_results") or []),
+                        },
+                        risk_level="L1",
                     )
 
                     logger.info(
@@ -573,7 +636,53 @@ def run_workflow(state):
                     attempt, task_id
                 )
 
-        # 5. Chat 任务
+        # 5a. 路由治理：需要澄清
+        elif state["task_type"] == "clarification":
+
+            from src.llm_client import chat_with_deepseek
+
+            check_execution_lease(
+                task_id, execution_token, heartbeat.lost_event
+            )
+
+            answer = chat_with_deepseek(
+                [{"role": "user", "content": state["question"]}],
+                system_prompt=(
+                    "用户的问题信息不足，需要澄清。请简短说明缺少哪些信息"
+                    "（如时间范围、平台、指标），并给出 1-2 个具体示例，"
+                    "引导用户补充后重新提问。不要编造数据。"
+                ),
+                agent_name="clarification",
+                task_id=task_id
+            )
+            state["report"] = answer
+            state["status"] = "completed"
+            state["error"] = None
+
+            save_workflow_state(state, execution_token=execution_token)
+            logger.info("澄清路由完成 | Task：%s", task_id)
+            return state
+
+        # 5b. 路由治理：拒绝执行
+        elif state["task_type"] == "reject":
+
+            check_execution_lease(
+                task_id, execution_token, heartbeat.lost_event
+            )
+
+            state["report"] = (
+                "该请求涉及受限操作或敏感数据，出于安全与合规考虑已拒绝执行。"
+                "如需查询业务数据，请提出明确的分析问题；"
+                "涉及敏感字段的需求请联系数据管理员。"
+            )
+            state["status"] = "rejected"
+            state["error"] = "请求被路由治理层拒绝"
+
+            save_workflow_state(state, execution_token=execution_token)
+            logger.warning("拒绝路由执行 | Task：%s", task_id)
+            return state
+
+        # 5c. Chat 任务
         elif state["task_type"] == "chat":
 
             if state["report"] is None:

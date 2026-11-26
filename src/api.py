@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,11 +25,27 @@ from src.storage.usage_storage import (
     get_dashboard_usage_trend
 )
 import logging
+from src.service.scheduler import (
+    start_scheduler,
+    shutdown_scheduler,
+    get_scheduler_status
+)
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """服务启动时开启定时调度，关闭时释放调度器。"""
+    start_scheduler()
+    yield
+    shutdown_scheduler()
+
+
 app = FastAPI(
     title="Multi-Agent Workflow API",
     description="多智能体数据分析工作流服务",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 app.add_middleware(
     CORSMiddleware,
@@ -67,7 +84,8 @@ class ChatRequest(BaseModel):
 def health_check():
     return {
         "status": "ok",
-        "message": "Multi-Agent API is running"
+        "message": "Multi-Agent API is running",
+        "scheduler": get_scheduler_status()
     }
 
 

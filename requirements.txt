@@ -15,3 +15,6 @@ openai>=1.0.0
 fastapi>=0.110.0
 uvicorn>=0.27.0
 pydantic>=2.5.0
+
+# Scheduler（定时 ETL，对齐母版 n8n Schedule Trigger）
+APScheduler>=3.10.0

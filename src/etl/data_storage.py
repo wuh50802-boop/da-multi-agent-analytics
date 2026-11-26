@@ -143,7 +143,11 @@ def save_to_dws():
         """
         cursor.execute(sql)
         connection.commit()
-        logger.info("DWS 达人日汇总生成成功，影响 %s 行", cursor.rowcount)
+        # rowcount 在 ON DUPLICATE KEY UPDATE 下会把更新算作 2 行，
+        # 用实际表行数更能反映结果（幂等覆盖后行数稳定）
+        cursor.execute("SELECT COUNT(*) FROM dws_kol_daily")
+        total_rows = cursor.fetchone()[0]
+        logger.info("DWS 达人日汇总生成成功，表内共 %s 行", total_rows)
     except mysql.connector.Error:
         if connection:
             connection.rollback()
@@ -197,7 +201,9 @@ def save_to_ads():
         """
         cursor.execute(sql)
         connection.commit()
-        logger.info("ADS 达人月榜生成成功，影响 %s 行", cursor.rowcount)
+        cursor.execute("SELECT COUNT(*) FROM ads_kol_rank")
+        total_rows = cursor.fetchone()[0]
+        logger.info("ADS 达人月榜生成成功，表内共 %s 行", total_rows)
     except mysql.connector.Error:
         if connection:
             connection.rollback()

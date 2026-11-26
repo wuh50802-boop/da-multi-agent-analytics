@@ -1,26 +1,28 @@
-import json
+"""数据采集统一入口。
+
+根据 config.DATA_SOURCE 选择采集器：
+    - mock_api：调用本地模拟开放平台 API（鉴权 + 分页 + 重试）
+    - doudian：真实抖店 API（需凭证）
+
+保持 fetch_data() 签名不变，ETL 主流程无需改动。
+"""
+
 import logging
 
-from config import MOCK_ORDERS_FILE
+from config import DATA_SOURCE, MOCK_API_HOST, MOCK_API_PORT
+from src.etl.collector import get_collector
 
 logger = logging.getLogger(__name__)
 
 
-def fetch_data():
-    """从本地模拟数据文件读取原始订单。
+def fetch_data(platform=None, start_time=None, end_time=None):
+    """通过采集器拉取原始订单，返回统一格式的订单字典列表。"""
+    base_url = f"http://{MOCK_API_HOST}:{MOCK_API_PORT}"
+    logger.info("数据源：%s | API 地址：%s", DATA_SOURCE, base_url)
 
-    替代原 jsonplaceholder API，保持函数签名不变，主流程无需改动。
-    """
-
-    logger.info("读取模拟订单数据：%s", MOCK_ORDERS_FILE)
-
-    try:
-        with MOCK_ORDERS_FILE.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        logger.info("读取成功，共 %s 条订单", len(data))
-        return data
-
-    except (OSError, ValueError):
-        logger.exception("模拟订单数据读取失败，请先运行 src/etl/mock_data_generator.py")
-        raise
+    collector = get_collector(data_source=DATA_SOURCE, base_url=base_url)
+    return collector.fetch_orders(
+        platform=platform,
+        start_time=start_time,
+        end_time=end_time,
+    )

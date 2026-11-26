@@ -8,8 +8,24 @@ BASE_DIR = Path(__file__).resolve().parent
 # 读取项目根目录的 .env
 load_dotenv(BASE_DIR / ".env")
 
-# 模拟数据源配置（已替代 jsonplaceholder 帖子 API）
+# 数据源配置：mock_api（本地模拟开放平台） / doudian（真实抖店，需凭证）
+DATA_SOURCE = os.getenv("DATA_SOURCE", "mock_api")
+
+# 模拟订单数据文件（模拟 API 服务的底层数据源）
 MOCK_ORDERS_FILE = BASE_DIR / "data" / "mock_orders.json"
+
+# 本地模拟开放平台 API
+MOCK_API_HOST = os.getenv("MOCK_API_HOST", "127.0.0.1")
+MOCK_API_PORT = int(os.getenv("MOCK_API_PORT", "8899"))
+MOCK_API_TOKEN = os.getenv("MOCK_API_TOKEN", "demo-token-2026")
+
+# 采集分页大小
+COLLECT_PAGE_SIZE = int(os.getenv("COLLECT_PAGE_SIZE", "200"))
+COLLECT_MAX_RETRIES = int(os.getenv("COLLECT_MAX_RETRIES", "3"))
+
+# 真实平台凭证（配置后可用 DATA_SOURCE=doudian 切换）
+DOUDIAN_APP_KEY = os.getenv("DOUDIAN_APP_KEY")
+DOUDIAN_APP_SECRET = os.getenv("DOUDIAN_APP_SECRET")
 
 # 文件目录
 DATA_DIR = BASE_DIR / "data"

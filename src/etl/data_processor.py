@@ -43,7 +43,8 @@ def transform_ods_to_dwd(ods_rows):
 
     for row in ods_rows:
         try:
-            data = json.loads(row["raw_data"]) if isinstance(row["raw_data"], str) else row["raw_data"]
+            raw = row.get("原始数据", row.get("raw_data"))
+            data = json.loads(raw) if isinstance(raw, str) else raw
 
             if any(not data.get(f) for f in REQUIRED_FIELDS):
                 skipped += 1
@@ -96,7 +97,7 @@ def transform_ods_to_dwd(ods_rows):
 
             dwd_records.append(tuple(values))
 
-        except (ValueError, TypeError, json.JSONDecodeError):
+        except (ValueError, TypeError, KeyError, json.JSONDecodeError):
             logger.exception("ODS 数据转换失败：%s", row.get("源记录ID"))
             skipped += 1
 

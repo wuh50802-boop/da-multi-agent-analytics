@@ -24,6 +24,11 @@ def create_initial_state(question, conversation_id=None):
         "conversation_id": conversation_id,
         "qa_result": None,
 
+        # QA 返工闭环：质检次数、历史记录、当前重写意见
+        "qa_attempts": 0,
+        "qa_history": [],
+        "revision_notes": None,
+
         "steps": {
             "routing": "pending",
             "sql_generation": "pending",

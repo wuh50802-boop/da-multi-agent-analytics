@@ -8,14 +8,26 @@ from src.prompts.report_generator import REPORT_GENERATOR_SYSTEM_PROMPT
 logger = logging.getLogger(__name__)
 
 
-def generate_report(question, sql, query_results, task_id=None):
-    """根据问题、SQL 和查询结果生成分析报告"""
+def generate_report(
+    question,
+    sql,
+    query_results,
+    task_id=None,
+    revision_notes=None
+):
+    """根据问题、SQL 和查询结果生成分析报告。
+
+    revision_notes 为上一轮 QA 的质检意见，非空时进入返工模式。
+    """
 
     context = {
         "用户问题": question,
         "执行的SQL": sql,
         "数据库查询结果": query_results
     }
+
+    if revision_notes:
+        context["质检意见"] = revision_notes
 
     messages = [
         {

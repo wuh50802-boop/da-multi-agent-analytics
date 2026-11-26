@@ -78,3 +78,6 @@ TOKEN_PRICE_UNIT = 1_000_000
 # 单个工作流任务的预算限制
 MAX_TASK_TOKENS = 100000
 MAX_TASK_COST_RMB = 1.0
+
+# QA 未通过时最多重写报告的次数（0 表示不返工，直接失败）
+MAX_QA_REVISIONS = int(os.getenv("MAX_QA_REVISIONS", "2"))

@@ -1,6 +1,7 @@
 import logging
 import threading
 
+from config import MAX_QA_REVISIONS
 from src.core.budget import BudgetExceededError
 from src.storage.workflow_storage import (
     load_workflow_state,
@@ -407,97 +408,170 @@ def run_workflow(state):
                     lost_event=heartbeat.lost_event
                 )
 
-            # 分析报告
-            if (
-                state["task_type"] == "analysis"
-                and state["report"] is None
-            ):
+            # 报告生成 + QA 质检 + 返工闭环
+            # 循环体内：生成报告 -> 质检 -> 通过则完成，不通过则带意见重写
+            while True:
 
-                state["report"] = run_step(
-                    state,
-                    "report_generation",
-                    generate_report,
-                    state["resolved_question"] or state["question"],
-                    state["sql"],
-                    state["query_results"],
-                    task_id=task_id,
-                    execution_token=execution_token,
-                    lost_event=heartbeat.lost_event
-                )
+                # 分析报告（首次生成，或返工后重新生成）
+                if (
+                    state["task_type"] == "analysis"
+                    and state["report"] is None
+                ):
 
-            # QA
-            if state["qa_result"] is None:
-
-                state["qa_result"] = run_step(
-                    state,
-                    "qa_review",
-                    review_task,
-                    question=(
-                        state["resolved_question"]
-                        or state["question"]
-                    ),
-                    task_type=state["task_type"],
-                    sql=state["sql"],
-                    query_results=state["query_results"],
-                    report=state["report"],
-                    task_id=task_id,
-                    execution_token=execution_token,
-                    lost_event=heartbeat.lost_event
-                )
-
-            # QA 门禁：未通过时不得标记完成
-            qa_result = state.get("qa_result") or {}
-            qa_passed = qa_result.get("passed") is True
-
-            check_execution_lease(
-                task_id,
-                execution_token,
-                heartbeat.lost_event
-            )
-
-            if not qa_passed:
-                issues = qa_result.get("issues") or []
-                state["status"] = "failed"
-
-                if issues:
-                    state["error"] = "QA 质检未通过：" + "；".join(
-                        str(issue) for issue in issues
+                    state["report"] = run_step(
+                        state,
+                        "report_generation",
+                        generate_report,
+                        state["resolved_question"] or state["question"],
+                        state["sql"],
+                        state["query_results"],
+                        task_id=task_id,
+                        execution_token=execution_token,
+                        lost_event=heartbeat.lost_event,
+                        revision_notes=state.get("revision_notes")
                     )
-                else:
-                    state["error"] = "QA 质检未通过"
 
-                # 重置 QA 步骤，恢复时可重新审核
-                state["steps"]["qa_review"] = "pending"
+                # QA 质检
+                if state["qa_result"] is None:
+
+                    state["qa_result"] = run_step(
+                        state,
+                        "qa_review",
+                        review_task,
+                        question=(
+                            state["resolved_question"]
+                            or state["question"]
+                        ),
+                        task_type=state["task_type"],
+                        sql=state["sql"],
+                        query_results=state["query_results"],
+                        report=state["report"],
+                        task_id=task_id,
+                        execution_token=execution_token,
+                        lost_event=heartbeat.lost_event
+                    )
+
+                qa_result = state.get("qa_result") or {}
+                qa_passed = qa_result.get("passed") is True
+
+                # 本次质检序号（质检结果存在后才计数）
+                attempt = state.get("qa_attempts", 0) + 1
+
+                check_execution_lease(
+                    task_id,
+                    execution_token,
+                    heartbeat.lost_event
+                )
+
+                # 质检通过 -> 完成
+                if qa_passed:
+                    state["qa_attempts"] = attempt
+                    state.setdefault("qa_history", []).append({
+                        "attempt": attempt,
+                        "passed": True,
+                        "issues": [],
+                        "suggestions": [],
+                        "summary": qa_result.get("summary")
+                    })
+
+                    state["status"] = "completed"
+                    state["error"] = None
+
+                    save_workflow_state(
+                        state,
+                        execution_token=execution_token
+                    )
+
+                    logger.info(
+                        "工作流完成 | Task：%s | QA 质检次数：%s",
+                        task_id, attempt
+                    )
+
+                    return state
+
+                # 质检未通过 -> 记录并判断是否返工
+                issues = qa_result.get("issues") or []
+                suggestions = qa_result.get("suggestions") or []
+                state["qa_attempts"] = attempt
+
+                state.setdefault("qa_history", []).append({
+                    "attempt": attempt,
+                    "passed": False,
+                    "issues": issues,
+                    "suggestions": suggestions,
+                    "summary": qa_result.get("summary")
+                })
+
+                can_revise = (
+                    state["task_type"] == "analysis"
+                    and state.get("report") is not None
+                    and attempt <= MAX_QA_REVISIONS
+                )
+
+                if not can_revise:
+                    state["status"] = "failed"
+
+                    if issues:
+                        detail = "；".join(str(i) for i in issues)
+                        state["error"] = (
+                            f"QA 质检未通过（已质检 {attempt} 次）：{detail}"
+                        )
+                    else:
+                        state["error"] = (
+                            f"QA 质检未通过（已质检 {attempt} 次）"
+                        )
+
+                    save_workflow_state(
+                        state,
+                        execution_token=execution_token
+                    )
+
+                    logger.warning(
+                        "QA 未通过且不可返工，任务失败 | Task：%s | "
+                        "次数：%s | Issues：%s",
+                        task_id, attempt, issues
+                    )
+
+                    return state
+
+                # 构造质检意见，回喂给报告 Agent
+                revision_lines = []
+                if issues:
+                    revision_lines.append(
+                        "质检提出的问题：\n"
+                        + "\n".join(
+                            f"- {issue}" for issue in issues
+                        )
+                    )
+                if suggestions:
+                    revision_lines.append(
+                        "质检改进建议：\n"
+                        + "\n".join(
+                            f"- {suggestion}" for suggestion in suggestions
+                        )
+                    )
+                revision_lines.append(
+                    f"这是第 {attempt} 次质检未通过，请基于同一份查询结果"
+                    "逐条修正上述问题。"
+                )
+
+                state["revision_notes"] = "\n\n".join(revision_lines)
+
+                # 重置报告与质检步骤，强制下一轮重新生成/重新质检
+                state["report"] = None
+                state["steps"]["report_generation"] = "pending"
                 state["qa_result"] = None
+                state["steps"]["qa_review"] = "pending"
 
                 save_workflow_state(
                     state,
                     execution_token=execution_token
                 )
 
-                logger.warning(
-                    "QA 未通过，任务标记为失败 | Task：%s | Issues：%s",
-                    task_id,
-                    issues
+                logger.info(
+                    "QA 未通过，触发第 %s 次返工 | Task：%s",
+                    attempt, task_id
                 )
-
-                return state
-
-            # 完成
-            state["status"] = "completed"
-            state["error"] = None
-
-            save_workflow_state(
-                state,
-                execution_token=execution_token
-            )
-
-            logger.info(
-                "工作流完成 | Task：%s",
-                task_id
-            )
-
-            return state
 
         # 5. Chat 任务
         elif state["task_type"] == "chat":

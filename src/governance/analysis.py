@@ -2,43 +2,27 @@
 
 对应母版「分析治理」：分析规划 Agent、查询预算守卫、结果有效性判断、空结果处理。
 """
-import json
 import logging
 
-from src.llm_client import chat_with_deepseek
-from src.prompts.analysis_planner import ANALYSIS_PLANNER_SYSTEM_PROMPT
+from src.agents.analysis_planner_agent import plan_analysis as run_analysis_plan
 from src.governance.audit import write_audit
 
 logger = logging.getLogger(__name__)
 
 
 def plan_analysis(question, task_id=None, trace_id=None):
-    """生成结构化分析计划（目标/指标/维度/策略）。"""
-    response = chat_with_deepseek(
-        [{"role": "user", "content": question}],
-        system_prompt=ANALYSIS_PLANNER_SYSTEM_PROMPT,
-        agent_name="analysis_planner",
-        task_id=task_id,
-    )
-    try:
-        plan = json.loads(response)
-    except (json.JSONDecodeError, ValueError):
-        logger.warning("分析计划解析失败，使用最小计划")
-        plan = {
-            "goal": question,
-            "metrics": [],
-            "dimensions": [],
-            "strategy": "直接生成 SQL",
-            "feasible": True,
-            "note": "计划解析失败",
-        }
+    """分析治理：调用分析规划 Agent，并把计划写入审计。
+
+    Agent 负责模型调用与 JSON 解析；治理层只负责留痕。
+    """
+    plan = run_analysis_plan(question, task_id=task_id)
 
     write_audit(
         "execution", f"分析规划：{plan.get('goal', '')[:60]}",
-        task_id=task_id, trace_id=trace_id, actor="analysis_planner",
+        task_id=task_id, trace_id=trace_id, actor="analysis_planner_agent",
         detail=plan, risk_level="L1",
     )
-    logger.info("分析规划完成：feasible=%s", plan.get("feasible"))
+    logger.info("分析规划治理留痕完成")
     return plan
 
 

@@ -17,6 +17,8 @@ from src.agents.sql_agent import generate_sql
 from src.agents.sql_executor import execute_sql
 from src.agents.report_agent import generate_report
 from src.agents.qa_agent import review_task
+from src.agents.chat_agent import generate_chat_response
+from src.agents.clarification_agent import ask_clarification
 from src.core.retry import retry_call
 from src.core.context_manager import (
     build_agent_context,
@@ -639,23 +641,13 @@ def run_workflow(state):
         # 5a. 路由治理：需要澄清
         elif state["task_type"] == "clarification":
 
-            from src.llm_client import chat_with_deepseek
-
             check_execution_lease(
                 task_id, execution_token, heartbeat.lost_event
             )
 
-            answer = chat_with_deepseek(
-                [{"role": "user", "content": state["question"]}],
-                system_prompt=(
-                    "用户的问题信息不足，需要澄清。请简短说明缺少哪些信息"
-                    "（如时间范围、平台、指标），并给出 1-2 个具体示例，"
-                    "引导用户补充后重新提问。不要编造数据。"
-                ),
-                agent_name="clarification",
-                task_id=task_id
+            state["report"] = ask_clarification(
+                state["question"], task_id=task_id
             )
-            state["report"] = answer
             state["status"] = "completed"
             state["error"] = None
 
@@ -687,50 +679,14 @@ def run_workflow(state):
 
             if state["report"] is None:
 
-                from src.llm_client import chat_with_deepseek
-
                 context = build_workflow_context(state)
-
-                messages = list(
-                    context.get("messages", [])
-                )
-
-                task_history = context.get(
-                    "task_history",
-                    []
-                )
-
-                if task_history:
-
-                    import json
-
-                    messages.append({
-                        "role": "system",
-                        "content": (
-                            "以下是与当前问题相关的历史任务摘要，"
-                            "仅用于理解对话上下文，不代表当前任务的执行结果：\n"
-                            + json.dumps(
-                                task_history,
-                                ensure_ascii=False,
-                                default=str
-                            )
-                        )
-                    })
-
-                messages.append({
-                    "role": "user",
-                    "content": (
-                        state["resolved_question"]
-                        or state["question"]
-                    )
-                })
 
                 state["report"] = run_step(
                     state,
                     "chat_response",
-                    chat_with_deepseek,
-                    messages,
-                    agent_name="chat",
+                    generate_chat_response,
+                    context,
+                    state["resolved_question"] or state["question"],
                     task_id=task_id,
                     execution_token=execution_token,
                     lost_event=heartbeat.lost_event

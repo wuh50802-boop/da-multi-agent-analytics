@@ -510,6 +510,15 @@ class DocUploadRequest(BaseModel):
 class RagQueryRequest(BaseModel):
     query: str = Field(min_length=1, max_length=1000)
     top_k: int | None = None
+    mode: str = "hybrid"
+
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, value):
+        mode = value.lower()
+        if mode not in {"bm25", "vector", "hybrid"}:
+            raise ValueError("mode 只能是 bm25 / vector / hybrid")
+        return mode
 
 
 @app.post("/admin/metadata/sync", response_model=MetadataSyncResponse)
@@ -594,9 +603,32 @@ def list_docs_api():
 
 @app.post("/admin/rag/search")
 def rag_search_api(request: RagQueryRequest):
-    """RAG 治理：向量检索"""
+    """RAG 治理：BM25 / 向量数据库 / 混合检索"""
     from src.governance.rag import retrieve
-    return {"data": retrieve(request.query, top_k=request.top_k)}
+    return {
+        "data": retrieve(
+            request.query,
+            top_k=request.top_k,
+            mode=request.mode,
+        )
+    }
+
+
+@app.post("/admin/rag/rebuild")
+def rag_rebuild_api():
+    """RAG 治理：从 MySQL 全量重建 Chroma 向量数据库"""
+    from src.governance.rag import rebuild_vector_db
+    from src.governance.audit import write_audit
+    try:
+        count = rebuild_vector_db()
+        write_audit(
+            "execution", "RAG 向量数据库重建",
+            actor="admin", detail={"chunks": count}, risk_level="L1",
+        )
+        return {"chunks": count}
+    except Exception:
+        logger.exception("向量库重建 API 失败")
+        raise HTTPException(status_code=500, detail="向量库重建失败")
 
 
 @app.get("/tasks/{task_id}/export")

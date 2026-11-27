@@ -18,3 +18,9 @@ pydantic>=2.5.0
 
 # Scheduler（定时 ETL，对齐母版 n8n Schedule Trigger）
 APScheduler>=3.10.0
+
+# RAG 检索增强：BM25 关键词 + Chroma 向量数据库 + 中文语义向量
+rank_bm25>=0.2.2
+jieba>=0.42.1
+chromadb>=1.5.9
+fastembed>=0.9.1

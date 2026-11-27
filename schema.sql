@@ -210,6 +210,7 @@ CREATE TABLE IF NOT EXISTS `sys_knowledge_chunks` (
   `chunk_index` INT NOT NULL COMMENT '切块序号',
   `content` TEXT NOT NULL COMMENT '切块内容',
   `embedding` LONGTEXT NOT NULL COMMENT '向量（JSON数组）',
+  `embedding_model` VARCHAR(64) NOT NULL DEFAULT 'hash' COMMENT '向量模型标识 hash/BAAI-bge-small-zh-v1.5',
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_doc_chunk` (`doc_id`, `chunk_index`),

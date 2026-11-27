@@ -5,6 +5,12 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
 
+# RAG 语义模型缓存固定到项目内，避免依赖系统临时目录
+os.environ.setdefault(
+    "FASTEMBED_CACHE_PATH",
+    str(BASE_DIR / "data" / "fastembed_cache")
+)
+
 # 读取项目根目录的 .env
 load_dotenv(BASE_DIR / ".env")
 
@@ -96,7 +102,23 @@ SENSITIVE_KEYWORDS = [
     "drop table", "truncate", "delete from", "update ", "alter table",
     "导出手机号", "导出用户", "全部手机号",
 ]
-# RAG 切块参数
+# ==================== RAG 检索增强配置 ====================
+# 切块参数
 RAG_CHUNK_SIZE = int(os.getenv("RAG_CHUNK_SIZE", "500"))
 RAG_CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "50"))
 RAG_TOP_K = int(os.getenv("RAG_TOP_K", "3"))
+
+# 检索模式：bm25 / vector / hybrid
+RAG_DEFAULT_MODE = os.getenv("RAG_DEFAULT_MODE", "hybrid")
+RAG_RRF_K = int(os.getenv("RAG_RRF_K", "60"))
+
+# 语义向量模型（首次使用需下载，缓存到 data/fastembed_cache）
+RAG_EMBEDDING_MODEL = os.getenv(
+    "RAG_EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5"
+)
+
+# Chroma 向量数据库（嵌入式持久化，无需单独服务）
+RAG_VECTOR_DB_PATH = BASE_DIR / "data" / "chroma_db"
+RAG_CHROMA_COLLECTION = os.getenv(
+    "RAG_CHROMA_COLLECTION", "rag_chunks"
+)

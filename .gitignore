@@ -20,3 +20,7 @@ logs/
 
 # 旧数据快照（已弃用，新数据源为 mock_orders）
 data/posts.csv
+
+# RAG 本地运行产物（语义模型缓存 + Chroma 向量数据库）
+data/fastembed_cache/
+data/chroma_db/

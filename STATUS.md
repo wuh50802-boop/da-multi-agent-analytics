@@ -97,11 +97,12 @@ RAG 技术栈：BM25（jieba）+ Chroma 持久化向量 DB + `bge-small-zh-v1.5`
 |---|---|---|
 | `47f82ae` | 企业治理全套 | ✅ 已推 |
 | `39957ce` | 元数据 ETL 末尾自动同步 + 过期字段清理 | ✅ 已推 |
-| `e96a135` | chat/clarification/analysis_planner 包装成 Agent | ❌ 未推 |
-| `a2a5136` | 混合 RAG（BM25 + Chroma + 语义向量） | ❌ 未推 |
-| `a8e083c` | Agent 体系完善（上下文/RAG 接入/tool calling） | ❌ 未推 |
+| `e96a135` | chat/clarification/analysis_planner 包装成 Agent | ✅ 已推 |
+| `a2a5136` | 混合 RAG（BM25 + Chroma + 语义向量） | ✅ 已推 |
+| `a8e083c` | Agent 体系完善（上下文/RAG 接入/tool calling） | ✅ 已推 |
+| `b3bd327` | 本文：STATUS.md 交接更新 | ✅ 已推 |
 
-**本地领先远端 3 个提交**。网络恢复后补推：
+**本地与远端已同步**（远端 HEAD `b3bd327`）。若后续再遇代理 502 / 连接重置，用无代理方式推送：
 
 ```bash
 env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy git -C "D:/AI_Projects/DA_Multi_Agent_Workflow_rebuild" push origin main

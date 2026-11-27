@@ -90,9 +90,38 @@ def sync_metadata():
 
         if records:
             cursor.executemany(insert_sql, records)
+
+        # 清理已下线/改名的表和字段，避免字典里残留旧记录。
+        # records 为空说明六张业务表对当前连接全部不可见，跳过清理以防误删。
+        deleted = 0
+        if records:
+            valid_keys = {(r[0], r[2]) for r in rows}
+            placeholders = ", ".join(["%s"] * len(GOVERNED_TABLES))
+            cursor.execute(
+                f"""
+                SELECT id, table_name, column_name
+                FROM sys_metadata_dict
+                WHERE table_name IN ({placeholders})
+                """,
+                tuple(GOVERNED_TABLES),
+            )
+            stale_ids = [
+                row[0] for row in cursor.fetchall()
+                if (row[1], row[2]) not in valid_keys
+            ]
+            if stale_ids:
+                cursor.executemany(
+                    "DELETE FROM sys_metadata_dict WHERE id = %s",
+                    [(id_,) for id_ in stale_ids],
+                )
+                deleted = len(stale_ids)
+
         conn.commit()
 
-        logger.info("元数据采集完成：%s 字段", len(records))
+        logger.info(
+            "元数据采集完成：新增/更新 %s 字段，清理 %s 条过期记录",
+            len(records), deleted,
+        )
         return len(records)
     except Exception:
         if conn:

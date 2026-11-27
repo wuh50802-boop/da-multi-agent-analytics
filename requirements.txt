@@ -24,3 +24,8 @@ rank_bm25>=0.2.2
 jieba>=0.42.1
 chromadb>=1.5.9
 fastembed>=0.9.1
+
+# Tool calling：LangChain 工具层（DeepSeek OpenAI 兼容端点）
+langchain>=1.5.0
+langchain-openai>=1.8.0
+langchain-core>=1.8.0

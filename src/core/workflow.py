@@ -13,6 +13,7 @@ from src.storage.workflow_storage import (
     release_workflow_lease
 )
 from src.agents.supervisor import route_task
+from src.agents.knowledge_agent import retrieve_business_context
 from src.agents.sql_agent import generate_sql
 from src.agents.sql_executor import execute_sql
 from src.agents.report_agent import generate_report
@@ -135,6 +136,7 @@ def run_step(
 
     result_fields = {
         "routing": "routing_result",
+        "knowledge_retrieval": "knowledge",
         "sql_generation": "sql",
         "sql_execution": "query_results",
         "report_generation": "report",
@@ -336,7 +338,21 @@ def run_workflow(state):
                     trace_id=state.get("trace_id"),
                 )
 
-            # SQL 生成
+            # RAG 业务口径检索（SQL 生成前）
+            # 走 run_step 保证断点续跑；检索失败降级为空，不阻断主流程
+            if state.get("knowledge") is None:
+
+                state["knowledge"] = run_step(
+                    state,
+                    "knowledge_retrieval",
+                    retrieve_business_context,
+                    state["resolved_question"] or state["question"],
+                    trace_id=state.get("trace_id"),
+                    execution_token=execution_token,
+                    lost_event=heartbeat.lost_event
+                )
+
+            # SQL 生成（注入业务口径）
             if state["sql"] is None:
 
                 state["sql"] = run_step(
@@ -345,6 +361,7 @@ def run_workflow(state):
                     generate_sql,
                     state["resolved_question"] or state["question"],
                     task_id=task_id,
+                    knowledge=state.get("knowledge"),
                     execution_token=execution_token,
                     lost_event=heartbeat.lost_event
                 )

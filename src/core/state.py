@@ -34,8 +34,12 @@ def create_initial_state(question, conversation_id=None):
         "analysis_plan": None,
         "user": None,
 
+        # RAG 业务口径检索结果
+        "knowledge": None,
+
         "steps": {
             "routing": "pending",
+            "knowledge_retrieval": "pending",
             "sql_generation": "pending",
             "sql_execution": "pending",
             "report_generation": "pending",

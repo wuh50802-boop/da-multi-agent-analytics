@@ -88,6 +88,10 @@ MAX_TASK_COST_RMB = 1.0
 # QA 未通过时最多重写报告的次数（0 表示不返工，直接失败）
 MAX_QA_REVISIONS = int(os.getenv("MAX_QA_REVISIONS", "2"))
 
+# Tool calling 增强模式：开启后 SQL Agent 可通过 LangChain 自主调用只读工具
+# 默认关闭（走原生 chat_with_deepseek），仅暴露只读工具，不影响人工审批门禁
+ENABLE_TOOL_CALLING = os.getenv("ENABLE_TOOL_CALLING", "false").lower() == "true"
+
 # ==================== 企业治理配置 ====================
 # 敏感字段清单（命中 SQL 时按权限分级拦截）
 SENSITIVE_FIELDS = {"用户ID", "收件省份", "收件城市", "原始数据"}

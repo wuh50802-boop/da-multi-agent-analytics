@@ -9,6 +9,73 @@ from ..storage.conversation_storage import get_conversation_history
 logger = logging.getLogger(__name__)
 
 
+def estimate_tokens(text):
+    """粗估 Token 数（中文约 1.5 token/字，英文约 1.3 token/词）。
+
+    不引入额外依赖，用于上下文裁剪的预算控制。
+    精度要求不高——只要能稳定防止上下文超长即可。
+    """
+    if not text:
+        return 0
+
+    chinese = re.findall(r"[\u4e00-\u9fff]", text)
+    words = re.findall(r"[a-zA-Z0-9_]+", text)
+    others = re.findall(r"[^\u4e00-\u9fff\s]", text)
+
+    return int(
+        len(chinese) * 1.5
+        + len(words) * 1.3
+        + len(others) * 0.5
+    )
+
+
+def inject_knowledge(context, knowledge_hits):
+    """把 RAG 检索命中的业务口径注入统一上下文。
+
+    放在 task_history 之后、截断之前，确保 limiter 能按优先级裁剪。
+    """
+    if not knowledge_hits:
+        return context
+
+    blocks = []
+    for index, hit in enumerate(knowledge_hits, start=1):
+        blocks.append({
+            "index": index,
+            "title": hit.get("title", ""),
+            "content": hit.get("content", ""),
+            "score": hit.get("score"),
+            "source": hit.get("source"),
+        })
+
+    context["knowledge"] = blocks
+    context.setdefault("metadata", {})["selected_knowledge"] = len(blocks)
+
+    logger.info(
+        "业务口径已注入上下文 | Task：%s | 命中：%s",
+        context.get("current_task", {}).get("task_id"),
+        len(blocks)
+    )
+    return context
+
+
+def format_knowledge_block(context):
+    """把上下文中的知识片段格式化为可直接拼入 Prompt 的文本。"""
+    knowledge = context.get("knowledge") or []
+    if not knowledge:
+        return ""
+
+    lines = [
+        "以下是与本问题相关的业务口径文档片段，"
+        "生成 SQL 时必须优先遵守（如与通用规则冲突，以文档口径为准）：",
+    ]
+    for item in knowledge:
+        lines.append(
+            f"[{item['index']}] 《{item['title']}》："
+            f"{item['content']}"
+        )
+    return "\n".join(lines)
+
+
 def retrieve_recent_messages(
     conversation_id,
     exclude_task_id=None,
@@ -318,11 +385,13 @@ def build_agent_context(
         },
         "messages": messages,
         "task_history": selected_tasks,
+        "knowledge": [],
         "metadata": {
             "total_messages": len(messages),
             "selected_messages": len(messages),
             "total_history": len(tasks),
-            "selected_tasks": len(selected_tasks)
+            "selected_tasks": len(selected_tasks),
+            "selected_knowledge": 0
         }
     }
 
@@ -340,91 +409,107 @@ def limit_context_size(
     context,
     max_messages=20,
     max_history=5,
-    max_chars=4000
+    max_chars=4000,
+    max_tokens=3000
 ):
     """
     限制上下文长度。
 
-    优先保留当前任务，其次保留最近对话消息，
-    最后追加相关历史任务。
+    裁剪优先级（从高到低）：
+      1. 当前任务（必须保留）
+      2. 业务口径知识 knowledge（RAG 命中，SQL 生成强依赖）
+      3. 最近对话消息
+      4. 相关历史任务摘要
+
+    同时受 max_chars 与 max_tokens 双重约束，任一超限即停止追加。
     """
 
     current_task = context.get("current_task", {})
     messages = context.get("messages", [])
     task_history = context.get("task_history", [])
+    knowledge = context.get("knowledge", [])
 
     limited_context = {
         "current_task": current_task,
         "messages": [],
         "task_history": [],
+        "knowledge": [],
         "metadata": context.get("metadata", {}).copy()
     }
 
+    def serialized(data):
+        return json.dumps(data, ensure_ascii=False, default=str)
+
     def get_context_size(data):
-        return len(
-            json.dumps(
-                data,
-                ensure_ascii=False,
-                default=str
-            )
+        return len(serialized(data))
+
+    def get_context_tokens(data):
+        return estimate_tokens(serialized(data))
+
+    def over_limit():
+        return (
+            get_context_size(limited_context) > max_chars
+            or get_context_tokens(limited_context) > max_tokens
         )
 
     def update_metadata():
-        limited_context["metadata"]["selected_messages"] = len(
-            limited_context["messages"]
-        )
-
-        limited_context["metadata"]["selected_tasks"] = len(
-            limited_context["task_history"]
-        )
-
-        limited_context["metadata"]["context_truncated"] = (
+        meta = limited_context["metadata"]
+        meta["selected_messages"] = len(limited_context["messages"])
+        meta["selected_tasks"] = len(limited_context["task_history"])
+        meta["selected_knowledge"] = len(limited_context["knowledge"])
+        meta["context_truncated"] = (
             len(limited_context["messages"]) < len(messages)
             or len(limited_context["task_history"]) < len(task_history)
+            or len(limited_context["knowledge"]) < len(knowledge)
+        )
+        meta["estimated_tokens"] = get_context_tokens(limited_context)
+        meta["token_limit_exceeded"] = (
+            get_context_tokens(limited_context) > max_tokens
         )
 
-        limited_context["metadata"]["size_limit_exceeded"] = (
-            get_context_size(limited_context) > max_chars
-        )
-
-    # 当前任务必须保留
-    if get_context_size(limited_context) > max_chars:
+    # 1. 当前任务必须保留；超限则只保留任务本身
+    if over_limit():
         limited_context["metadata"]["selected_messages"] = 0
         limited_context["metadata"]["selected_tasks"] = 0
+        limited_context["metadata"]["selected_knowledge"] = 0
         limited_context["metadata"]["context_truncated"] = True
-        limited_context["metadata"]["size_limit_exceeded"] = True
-
-        logger.warning("当前任务上下文已超过字符限制")
-
+        limited_context["metadata"]["token_limit_exceeded"] = True
+        logger.warning("当前任务上下文已超过限制")
         return limited_context
 
-    # 优先保留最近的原始对话
+    # 2. 业务口径优先于对话与历史任务
+    for item in knowledge:
+        limited_context["knowledge"].append(item)
+        if over_limit():
+            limited_context["knowledge"].pop()
+            break
+
+    # 3. 保留最近的原始对话
     recent_messages = messages[-max(0, max_messages):]
 
     for message in reversed(recent_messages):
         limited_context["messages"].insert(0, message)
-
-        if get_context_size(limited_context) > max_chars:
+        if over_limit():
             limited_context["messages"].pop(0)
             break
 
-    # 再追加相关历史任务
+    # 4. 最后追加相关历史任务
     candidates = task_history[:max(0, max_history)]
 
     for task in candidates:
         limited_context["task_history"].append(task)
-
-        if get_context_size(limited_context) > max_chars:
+        if over_limit():
             limited_context["task_history"].pop()
             break
 
     update_metadata()
 
     logger.info(
-        "Agent 上下文长度控制完成 | 消息：%s | 历史任务：%s | 字符数：%s",
+        "Agent 上下文长度控制完成 | 消息：%s | 历史任务：%s | 口径：%s | 估算 Token：%s",
         len(limited_context["messages"]),
         len(limited_context["task_history"]),
-        get_context_size(limited_context)
+        len(limited_context["knowledge"]),
+        limited_context["metadata"].get("estimated_tokens")
     )
 
     return limited_context
